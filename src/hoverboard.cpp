@@ -8,27 +8,24 @@
 #include <rosparam_shortcuts/rosparam_shortcuts.h>
 
 Hoverboard::Hoverboard() {
-    hardware_interface::JointStateHandle left_wheel_state_handle("left_wheel",
-								 &joints[0].pos.data,
-								 &joints[0].vel.data,
-								 &joints[0].eff.data);
-    hardware_interface::JointStateHandle right_wheel_state_handle("right_wheel",
-								  &joints[1].pos.data,
-								  &joints[1].vel.data,
-								  &joints[1].eff.data);
-    joint_state_interface.registerHandle (left_wheel_state_handle);
-    joint_state_interface.registerHandle (right_wheel_state_handle);
-    registerInterface(&joint_state_interface);
 
-    hardware_interface::JointHandle left_wheel_vel_handle(
-        joint_state_interface.getHandle("left_wheel"),
-        &joints[0].cmd.data);
-    hardware_interface::JointHandle right_wheel_vel_handle(
-        joint_state_interface.getHandle("right_wheel"),
-        &joints[1].cmd.data);
-    velocity_joint_interface.registerHandle (left_wheel_vel_handle);
-    velocity_joint_interface.registerHandle (right_wheel_vel_handle);
-    registerInterface(&velocity_joint_interface);
+  	ros::V_string joint_names = boost::assign::list_of
+  		("front_left_wheel_joint")("front_right_wheel_joint")
+  		("rear_left_wheel_joint")("rear_right_wheel_joint");
+
+	for (unsigned int i = 0; i < joint_names.size(); i++) {
+
+		hardware_interface::JointStateHandle joint_state_handle(joint_names[i],
+																&joints[i].pos.data,
+																&joints[i].vel.data,
+																&joints[i].eff.data);
+	  	joint_state_interface.registerHandle(joint_state_handle);
+
+		hardware_interface::JointHandle joint_handle(joint_state_handle, &joints[i].cmd.data);
+	  	velocity_joint_interface.registerHandle(joint_handle);
+	}
+  	registerInterface(&joint_state_interface);
+  	registerInterface(&velocity_joint_interface);
 
     // These publishers are only for debugging purposes
     vel_pub[0]    = nh.advertise<std_msgs::Float64>("hoverboard/left_wheel/velocity", 3);
@@ -44,7 +41,6 @@ Hoverboard::Hoverboard() {
     std::size_t error = 0;
     error += !rosparam_shortcuts::get("hoverboard_driver", nh, "hoverboard_velocity_controller/wheel_radius", wheel_radius);
     error += !rosparam_shortcuts::get("hoverboard_driver", nh, "hoverboard_velocity_controller/linear/x/max_velocity", max_velocity);
-    error += !rosparam_shortcuts::get("hoverboard_driver", nh, "robaka/direction", direction_correction);
     rosparam_shortcuts::shutdownIfError("hoverboard_driver", error);
 
     if (!rosparam_shortcuts::get("hoverboard_driver", nh, "port", port)) {
@@ -65,9 +61,9 @@ Hoverboard::Hoverboard() {
     ros::NodeHandle nh_left(nh, "pid/left");
     ros::NodeHandle nh_right(nh, "pid/right");
     // Init PID controller
-    pids[0].init(nh_left, 1.0, 0.0, 0.0, 0.01, 1.5, -1.5, true, max_velocity, -max_velocity);
+    pids[0].init(nh_left, 2.1, 0.0, 0.0, 0.01, 1.5, -1.5, true, max_velocity, -max_velocity);
     pids[0].setOutputLimits(-max_velocity, max_velocity);
-    pids[1].init(nh_right, 1.0, 0.0, 0.0, 0.01, 1.5, -1.5, true, max_velocity, -max_velocity);
+    pids[1].init(nh_right, 2.1, 0.0, 0.0, 0.01, 1.5, -1.5, true, max_velocity, -max_velocity);
     pids[1].setOutputLimits(-max_velocity, max_velocity);
 
     if ((port_fd = open(port.c_str(), O_RDWR | O_NOCTTY | O_NDELAY)) < 0) {
@@ -140,17 +136,14 @@ void Hoverboard::protocol_recv (char byte) {
     if (msg_len == sizeof(SerialFeedback)) {
         uint16_t checksum = (uint16_t)(
             msg.start ^
-            msg.cmd1 ^
-            msg.cmd2 ^
-            msg.speedR_meas ^
-            msg.speedL_meas ^
-	        msg.wheelR_cnt ^
-	        msg.wheelL_cnt ^
+			msg.leftSpeed ^
+            msg.rightSpeed ^
+			msg.leftTicks ^
+	        msg.rightTicks ^
             msg.batVoltage ^
-            msg.boardTemp ^
-            msg.cmdLed);
+            msg.boardTemp);
 
-        if (msg.start == START_FRAME && msg.checksum == checksum) {
+        if (msg.checksum == checksum) {
             std_msgs::Float64 f;
 
             f.data = (double)msg.batVoltage/100.0;
@@ -160,13 +153,17 @@ void Hoverboard::protocol_recv (char byte) {
             temp_pub.publish(f);
 
             // Convert RPM to RAD/S
-            joints[0].vel.data = direction_correction * (abs(msg.speedL_meas) * 0.10472);
-            joints[1].vel.data = direction_correction * (abs(msg.speedR_meas) * 0.10472);
+            joints[0].vel.data = msg.leftSpeed * 0.10472;
+            joints[1].vel.data = msg.rightSpeed * 0.10472;
             vel_pub[0].publish(joints[0].vel);
             vel_pub[1].publish(joints[1].vel);
 
+            // Rear wheels
+		  	joints[2].vel.data = joints[0].vel.data;
+		  	joints[3].vel.data = joints[1].vel.data;
+
             // Process encoder values and update odometry
-            on_encoder_update (msg.wheelR_cnt, msg.wheelL_cnt);
+            on_encoder_update(msg.rightTicks, msg.leftTicks);
         } else {
             ROS_WARN("Hoverboard checksum mismatch: %d vs %d", msg.checksum, checksum);
         }
@@ -194,15 +191,13 @@ void Hoverboard::write(const ros::Time& time, const ros::Duration& period) {
         pid_outputs[1] / 0.10472
     };
 
-    // Calculate steering from difference of left and right
-    const double speed = (set_speed[0] + set_speed[1])/2.0;
-    const double steer = (set_speed[0] - speed)*2.0;
+  	//ROS_INFO("Set speed: %d %d", (int16_t)set_speed[0], (int16_t)set_speed[1]);
 
     SerialCommand command;
     command.start = (uint16_t)START_FRAME;
-    command.steer = (int16_t)steer;
-    command.speed = (int16_t)speed;
-    command.checksum = (uint16_t)(command.start ^ command.steer ^ command.speed);
+    command.left = (int16_t)set_speed[0];
+    command.right = (int16_t)set_speed[1];
+    command.checksum = (uint16_t)(command.start ^ command.left ^ command.right);
 
     int rc = ::write(port_fd, (const void*)&command, sizeof(command));
     if (rc < 0) {
@@ -228,13 +223,14 @@ void Hoverboard::on_encoder_update (int16_t right, int16_t left) {
     posL = left + multL*(ENCODER_MAX-ENCODER_MIN);
     last_wheelcountL = left;
 
-    // When the board shuts down and restarts, wheel ticks are reset to zero so the robot can be suddently lost
+    // When the board shuts down and restarts, wheel ticks are reset to zero so the robot can be suddenly lost
     // This section accumulates ticks even if board shuts down and is restarted   
     static double lastPosL = 0.0, lastPosR = 0.0;
     static double lastPubPosL = 0.0, lastPubPosR = 0.0;
+    //static double lastPubPosRearL = 0.0, lastPubPosRearR = 0.0;
     static bool nodeStartFlag = true;
     
-    //IF there has been a pause in receiving data AND the new number of ticks is close to zero, indicates a board restard
+    //IF there has been a pause in receiving data AND the new number of ticks is close to zero, indicates a board restarted
     //(the board seems to often report 1-3 ticks on startup instead of zero)
     //reset the last read ticks to the startup values
     if((ros::Time::now() - last_read).toSec() > 0.2
@@ -246,11 +242,11 @@ void Hoverboard::on_encoder_update (int16_t right, int16_t left) {
     double posRDiff = 0;
 
     //if node is just starting keep odom at zeros
-	if(nodeStartFlag){
+	if (nodeStartFlag) {
 		nodeStartFlag = false;
-	}else{
-            posLDiff = posL - lastPosL;
-            posRDiff = posR - lastPosR;
+	} else {
+		posLDiff = posL - lastPosL;
+		posRDiff = posR - lastPosR;
 	}
 
     lastPubPosL += posLDiff;
@@ -259,8 +255,12 @@ void Hoverboard::on_encoder_update (int16_t right, int16_t left) {
     lastPosR = posR;
     
     // Convert position in accumulated ticks to position in radians
-    joints[0].pos.data = 2.0*M_PI * lastPubPosL/(double)TICKS_PER_ROTATION;
-    joints[1].pos.data = 2.0*M_PI * lastPubPosR/(double)TICKS_PER_ROTATION;
+    joints[0].pos.data = 2.0 * M_PI * lastPubPosL / (double)TICKS_PER_ROTATION;
+    joints[1].pos.data = 2.0 * M_PI * lastPubPosR / (double)TICKS_PER_ROTATION;
+
+    // Rear wheels
+  	joints[2].pos.data = joints[0].pos.data;
+  	joints[3].pos.data = joints[1].pos.data;
 
     pos_pub[0].publish(joints[0].pos);
     pos_pub[1].publish(joints[1].pos);

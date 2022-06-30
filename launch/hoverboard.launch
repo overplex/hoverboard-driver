@@ -1,7 +1,8 @@
 <launch>
-    <!-- Include this in your launch file to change port -->
-    <!-- <param name="port" type="str" value="/dev/ttyTHS1"/> -->
-
+    <param name="port" type="str" value="/dev/ttyUSB0"/>
+    <param name="robot_description" command="$(find xacro)/xacro '$(find lumen)/urdf/lumen.xacro' --inorder" />
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"
+        respawn="false" output="screen" />
     <rosparam file="$(find hoverboard_driver)/config/hardware.yaml" command="load"/>
     <rosparam file="$(find hoverboard_driver)/config/controllers.yaml" command="load"/>
     <node name="hoverboard_driver" pkg="hoverboard_driver" type="hoverboard_driver" output="screen"/>
