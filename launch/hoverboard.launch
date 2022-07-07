@@ -1,11 +1,30 @@
 <launch>
-    <param name="port" type="str" value="/dev/ttyUSB0"/>
-    <param name="robot_description" command="$(find xacro)/xacro '$(find lumen)/urdf/lumen.xacro' --inorder" />
+    <!-- Parameter contains path to robot model -->
+    <param name="robot_description" command="$(find xacro)/xacro '$(find lumen)/urdf/lumen.xacro' --inorder"/>
+
+    <!-- JointStates to 3D poses of the robot links -->
     <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"
-        respawn="false" output="screen" />
+          respawn="false" output="screen"/>
+
+    <!-- Hoverboard driver params -->
+    <param name="port" type="str" value="/dev/ttyUSB0"/>
     <rosparam file="$(find hoverboard_driver)/config/hardware.yaml" command="load"/>
     <rosparam file="$(find hoverboard_driver)/config/controllers.yaml" command="load"/>
+
+    <!-- Wheels states to JointStates -->
+    <!-- Publish odometry to hoverboard_velocity_controller/odom -->
+    <!-- Control robot from topic hoverboard_velocity_controller/cmd_vel -->
     <node name="hoverboard_driver" pkg="hoverboard_driver" type="hoverboard_driver" output="screen"/>
     <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false" output="screen"
-        args="hoverboard_joint_publisher hoverboard_velocity_controller" />
+          args="hoverboard_joint_publisher hoverboard_velocity_controller"/>
+
+    <!-- IMU Relay and Filter -->
+    <include file="$(find hoverboard_driver)/launch/include/imu.launch"/>
+
+    <!-- Odom-IMU Extended Kalman Filter -->
+    <node pkg="robot_localization" type="ekf_localization_node" name="ekf_localization">
+        <remap from="odometry/filtered" to="odom"/>
+        <rosparam command="load" file="$(find hoverboard_driver)/config/ekf_localization.yaml"/>
+    </node>
+
 </launch>

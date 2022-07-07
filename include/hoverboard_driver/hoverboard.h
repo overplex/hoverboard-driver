@@ -5,6 +5,8 @@
 #include <hardware_interface/joint_state_interface.h>
 #include <hardware_interface/robot_hw.h>
 #include <realtime_tools/realtime_buffer.h>
+#include <sensor_msgs/Imu.h>
+#include <sensor_msgs/MagneticField.h>
 #include <std_msgs/Float64.h>
 #include <std_msgs/Bool.h>
 #include <dynamic_reconfigure/server.h>
@@ -16,60 +18,73 @@
 class HoverboardAPI;
 
 class Hoverboard : public hardware_interface::RobotHW {
-public:
-    Hoverboard();
-    ~Hoverboard();
-    
-    void read();
-    void write(const ros::Time& time, const ros::Duration& period);
-    void tick();
+ public:
+	Hoverboard();
+	~Hoverboard();
+
+	void read();
+	void write(const ros::Time &time, const ros::Duration &period);
+	void tick();
  private:
-    void protocol_recv (char c);
-    void on_encoder_update (int16_t right, int16_t left);
- 
-    hardware_interface::JointStateInterface joint_state_interface;
-    hardware_interface::VelocityJointInterface velocity_joint_interface;
+	void protocol_recv(char c);
+	void on_imu_data();
+	void on_hoverboard_data();
+	void on_encoder_update(int16_t right, int16_t left);
 
-    // The units for wheels are radians (pos), radians per second (vel,cmd), and Netwton metres (eff)
-    struct Joint {
-        std_msgs::Float64 pos;
-        std_msgs::Float64 vel;
-        std_msgs::Float64 eff;
-        std_msgs::Float64 cmd;
-    } joints[2];
+	hardware_interface::JointStateInterface joint_state_interface;
+	hardware_interface::VelocityJointInterface velocity_joint_interface;
 
-    // Publishers
-    ros::NodeHandle nh;
-    ros::Publisher vel_pub[2];
-    ros::Publisher pos_pub[2];    
-    ros::Publisher cmd_pub[2];
-    ros::Publisher voltage_pub;
-    ros::Publisher temp_pub;
-    ros::Publisher connected_pub;
+	// The units for wheels are radians (pos), radians per second (vel,cmd), and Newton metres (eff)
+	struct Joint {
+		std_msgs::Float64 pos;
+		std_msgs::Float64 vel;
+		std_msgs::Float64 eff;
+		std_msgs::Float64 cmd;
+	} joints[2];
 
-    double wheel_radius;
-    double max_velocity = 0.0;
-    int direction_correction = 1;
-    std::string port;
+	// Publishers
+	ros::NodeHandle nh;
+	ros::Publisher vel_pub[2];
+	ros::Publisher pos_pub[2];
+	ros::Publisher cmd_pub[2];
+	ros::Publisher voltage_pub;
+	ros::Publisher temp_pub;
+	ros::Publisher connected_pub;
+	ros::Publisher imu_pub;
+	ros::Publisher mag_pub;
 
-    ros::Time last_read;
-    // Last known encoder values
-    int16_t last_wheelcountR;
-    int16_t last_wheelcountL;
-    // Count of full encoder wraps
-    int multR;
-    int multL;
-    // Thresholds for calculating the wrap
-    int low_wrap;
-    int high_wrap;
+	std::string port;
+	double wheel_radius;
+	double max_velocity = 0.0;
+	int direction_correction = 1;
 
-    // Hoverboard protocol
-    int port_fd;
-    int msg_len = 0;
-    char prev_byte = 0;
-    uint16_t start_frame = 0;
-    char* p;
-    SerialFeedback msg, prev_msg;
+	ros::Time last_read;
+	// Last known encoder values
+	int16_t last_wheelcountR;
+	int16_t last_wheelcountL;
+	// Count of full encoder wraps
+	int multR;
+	int multL;
+	// Thresholds for calculating the wrap
+	int low_wrap;
+	int high_wrap;
 
-    PID pids[2];
+	// UART
+	char *p;
+	int port_fd;
+	int msg_len = 0;
+	char prev_byte = 0;
+	uint16_t start_frame = 0;
+	uint16_t current_start_frame = 0;
+
+	// Hoverboard protocol
+	SerialFeedback hb_msg;
+	std::size_t serialFeedbackSize;
+
+	// IMU
+	ImuData imu_msg;
+	std::size_t imuDataSize;
+	std::string imuFrameId = "imu_link";
+
+	PID pids[2];
 };
