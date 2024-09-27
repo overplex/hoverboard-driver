@@ -10,40 +10,42 @@ hoverboard_velocity_controller:
   pose_covariance_diagonal : [0.001, 0.001, 1000000.0, 1000000.0, 1000000.0, 1000.0]
   twist_covariance_diagonal: [0.001, 0.001, 1000000.0, 1000000.0, 1000000.0, 1000.0]
 
-  # Wheel separation and diameter. These are both optional.
-  # diff_drive_controller will attempt to read either one or both from the
-  # URDF if not specified as a parameter
+  # Wheel separation and diameter.
   wheel_separation : 0.472
-  wheel_radius : 0.089125
+  # Measured circumference with a ruler: (0.543 m / pi) / 2
+  wheel_radius : 0.086421134
 
   # Wheel separation and radius multipliers
   wheel_separation_multiplier: 1.0 # default: 1.0
   wheel_radius_multiplier    : 1.0 # default: 1.0
 
   # Velocity commands timeout [s], default 0.5
-  cmd_vel_timeout: 0.5
+  cmd_vel_timeout: 0.3
 
   # Base frame_id
   base_frame_id: base_footprint
   allow_multiple_cmd_vel_publishers: true
   odom_frame_id: '/odom'
-  enable_odom_tf: false
+
+  # Odometry fused with IMU is published by robot_localization, so
+  # no need to publish a TF based on encoders alone.
+  enable_odom_tf: true
 
   # Velocity and acceleration limits
   # Whenever a min_* is unspecified, default to -max_*
   linear:
     x:
       has_velocity_limits    : true # was true
-      max_velocity           : 0.7  # m/s
+      max_velocity           : 1.0  # m/s
       has_acceleration_limits: true # was true
-      max_acceleration       : 0.3  # m/s^2
-      has_jerk_limits        : true # was true
-      max_jerk               : 0.3  # m/s^3
+      max_acceleration       : 1.0  # m/s^2
+      has_jerk_limits        : false # was true
+      max_jerk               : 1.0  # m/s^3
   angular:
     z:
       has_velocity_limits    : true # was true
       max_velocity           : 6.28 # rad/s
       has_acceleration_limits: true # was true
       max_acceleration       : 3.14 # rad/s^2
-      has_jerk_limits        : true # was true
+      has_jerk_limits        : false # was true
       max_jerk               : 3.14 # rad/s^3

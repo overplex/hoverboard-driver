@@ -32,7 +32,7 @@ include_directories(
 )
 
 add_executable(${PROJECT_NAME} 
-  src/hoverboard.cpp 
+  src/hoverboard.cpp
   src/pid.cpp
   src/main.cpp
 )

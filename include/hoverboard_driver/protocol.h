@@ -6,7 +6,6 @@
 #define _FOC_PROTOCOL_H
 
 #define HB_START_FRAME 0xABCD
-#define IMU_START_FRAME 0xBCDE
 
 typedef struct {
   uint16_t start;
@@ -17,6 +16,8 @@ typedef struct {
 
 typedef struct {
   uint16_t start;
+  //int16_t cmd1;
+  //int16_t cmd2;
   int16_t leftSpeed;
   int16_t rightSpeed;
   uint16_t leftTicks;
@@ -25,17 +26,5 @@ typedef struct {
   int16_t boardTemp;
   uint16_t checksum;
 } SerialFeedback;
-
-typedef struct {
-  float x, y, z;
-} vector_t;
-
-typedef struct {
-  uint16_t start;
-  vector_t mag;
-  vector_t gyro;
-  vector_t accel;
-  uint16_t checksum;
-} ImuData;
 
 #endif

@@ -7,7 +7,6 @@
           respawn="false" output="screen"/>
 
     <!-- Hoverboard driver params -->
-    <param name="port" type="str" value="/dev/ttyUSB0"/>
     <rosparam file="$(find hoverboard_driver)/config/hardware.yaml" command="load"/>
     <rosparam file="$(find hoverboard_driver)/config/controllers.yaml" command="load"/>
 
@@ -18,13 +17,22 @@
     <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false" output="screen"
           args="hoverboard_joint_publisher hoverboard_velocity_controller"/>
 
-    <!-- IMU Relay and Filter -->
-    <include file="$(find hoverboard_driver)/launch/include/imu.launch"/>
+    <!-- IMU -->
+    <!-- Publish static transform from base_link to imu_link (rotate IMU -90 degrees)
+    <node pkg="tf2_ros" type="static_transform_publisher" name="base_footprint_to_imu_link"
+          args="0.1 0 0.61 -1.5707963267948966 0 0 base_footprint imu_link"/> -->
+    <node pkg="tf2_ros" type="static_transform_publisher" name="base_footprint_to_imu_link"
+          args="0.028 0 0.634 0 0 0 base_footprint imu_link"/>
 
-    <!-- Odom-IMU Extended Kalman Filter -->
-    <node pkg="robot_localization" type="ekf_localization_node" name="ekf_localization">
-        <remap from="odometry/filtered" to="odom"/>
-        <rosparam command="load" file="$(find hoverboard_driver)/config/ekf_localization.yaml"/>
-    </node>
+    <!-- Rosserial -->
+    <node pkg="rosserial_server" type="socket_node" name="rosserial_server"/>
 
+    <!-- EKF
+    <include file="$(find hoverboard_driver)/launch/include/ekf.launch"/> -->
+
+    <!-- PID
+    <include file="$(find hoverboard_driver)/launch/include/pid.launch"/> -->
+
+    <!-- WebSocket Server -->
+    <include file="$(find rosbridge_server)/launch/rosbridge_websocket.launch"/>
 </launch>

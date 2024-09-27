@@ -1,37 +1,45 @@
+#     x,      y,    z, // Values of coordinates
+#  roll,  pitch,  yaw, // Values of rotates
+#    vx,     vy,   vz, // Speeds of movement
+# vroll, vpitch, vyaw, // Speeds of rotates
+#    ax,     ay,   az  // Accelerations of movement
+
+debug: false
 frequency: 50
 two_d_mode: true
-debug: false
+publish_tf: true
 
+map_frame: map
 odom_frame: odom                 # Defaults to "odom" if unspecified
 base_link_frame: base_footprint  # Defaults to "base_link" if unspecified
 world_frame: odom                # Defaults to the value of odom_frame if unspecified
 
 odom0: /hoverboard_velocity_controller/odom
-# x     , y     , z,
-# roll  , pitch , yaw,
-# vx    , vy    , vz,
-# vroll , vpitch, vyaw,
-# ax    , ay    , az
 odom0_config: [false, false, false,
                false, false, false,
-               true,  true,  false,
+                true,  true, false,
                false, false, false,
                false, false, false]
 odom0_differential: false
 odom0_relative: false
-odom0_queue_size: 10
+odom0_queue_size: 5
 
-imu0: /imu/data
-# x     , y     , z,
-# roll  , pitch , yaw,
-# vx    , vy    , vz,
-# vroll , vpitch, vyaw,
-# ax    , ay    , az
+imu0: /imu
 imu0_config: [false, false, false,
-              false, false, true,
+               true,  true,  true,
               false, false, false,
-              false, false, true,
+               true,  true,  true,
               false, false, false]
 imu0_differential: false
-imu0_relative: true
-imu0_queue_size: 10
+imu0_relative: false
+imu0_queue_size: 5
+
+#odom1: /visual_odom
+#odom1_config: [ true,  true,  true,
+#               false, false, false,
+#               false, false, false,
+#               false, false, false,
+#               false, false, false]
+#odom1_differential: false
+#odom1_relative: true
+#odom1_queue_size: 5

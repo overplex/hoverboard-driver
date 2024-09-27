@@ -1,7 +1,5 @@
 #pragma once
 
-#define DEFAULT_PORT "/dev/ttyTHS1"
-
 #define ENCODER_MIN 0
 #define ENCODER_MAX 9000
 #define ENCODER_LOW_WRAP_FACTOR 0.3
